@@ -3,7 +3,7 @@ import pandas as pd
 
 site = ""  # ex: http://domain.com/SecretServer
 authApi = "/oauth2/token"
-api = site + "/api/v1"
+api = site + "/api/v2"
 token = ""
 
 
@@ -12,7 +12,7 @@ def GetTotalNumberOfSecrets(token):
         "Authorization": "Bearer " + token,
         "content-type": "application/json",
     }
-    resp = requests.get(api + "/secrets/", headers=headers)
+    resp = requests.get(api + "/secrets/?take=99999", headers=headers)
     if resp.status_code not in (200, 304):
         raise Exception(
             "Error retrieving Secrets. %s %s" % (resp.status_code, resp)
