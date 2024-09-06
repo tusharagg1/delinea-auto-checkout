@@ -21,7 +21,13 @@ def GetTotalNumberOfSecrets(token):
     df = pd.DataFrame(secrets["records"])
 
     # Filter rows where 'lastHeartBeatStatus' is 'Failed'
-    failed_heartbeats = df[df["lastHeartBeatStatus"] == "Failed"]
+    status_filters = [
+        "Failed",
+        "UnableToConnect",
+        "AccountLockedOut",
+        "UnknownError",
+    ]
+    failed_heartbeats = df[df["lastHeartBeatStatus"].isin(status_filters)]
 
     # Display the filtered DataFrame
     print(failed_heartbeats)
