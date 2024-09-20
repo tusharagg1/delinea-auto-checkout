@@ -7,7 +7,7 @@ api = site + "/api/v2"
 token = ""
 
 
-def GetFailedHeartbeatSecrets(token):
+def GetFailedHeartbeatSecrets():
     headers = {
         "Authorization": "Bearer " + token,
         "content-type": "application/json",
@@ -44,8 +44,3 @@ def GetFailedHeartbeatSecrets(token):
     ].id
 
     return failed_heartbeats
-
-
-# Example usage
-GetFailedHeartbeatSecrets(token)
-# print("Total number of secrets: %d" % total_secrets)
