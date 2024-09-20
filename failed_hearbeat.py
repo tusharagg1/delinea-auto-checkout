@@ -7,7 +7,7 @@ api = site + "/api/v2"
 token = ""
 
 
-def GetTotalNumberOfSecrets(token):
+def GetFailedHeartbeatSecrets(token):
     headers = {
         "Authorization": "Bearer " + token,
         "content-type": "application/json",
@@ -27,12 +27,25 @@ def GetTotalNumberOfSecrets(token):
         "AccountLockedOut",
         "UnknownError",
     ]
-    failed_heartbeats = df[df["lastHeartBeatStatus"].isin(status_filters)]
 
-    # Display the filtered DataFrame
-    print(failed_heartbeats)
+    secret_templates = [
+        "Active Directory Account",
+        "ATCO Active Directory",
+        "ATCO Active directory account",
+        "ATCO Active directory account -NO Heartbeat",
+        "ATCO Active directory account RDP/PUTTY",
+        "ATCO Active directory account-linux",
+        "ATCO Active directory account-linux-Ansible-Heartbeat",
+        "ATCO RSA POC Domain Controllers Active Directory Account",
+    ]
+    failed_heartbeats = df[
+        df["lastHeartBeatStatus"].isin(secret_templates)
+        & df["lastHeartBeatStatus"].isin(status_filters)
+    ].id
+
+    return failed_heartbeats
 
 
 # Example usage
-GetTotalNumberOfSecrets(token)
+GetFailedHeartbeatSecrets(token)
 # print("Total number of secrets: %d" % total_secrets)
