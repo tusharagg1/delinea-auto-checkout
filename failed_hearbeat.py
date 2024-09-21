@@ -39,7 +39,7 @@ def GetFailedHeartbeatSecrets():
         "ATCO RSA POC Domain Controllers Active Directory Account",
     ]
     failed_heartbeats = df[
-        df["lastHeartBeatStatus"].isin(secret_templates)
+        df["secretTemplateName"].isin(secret_templates)
         & df["lastHeartBeatStatus"].isin(status_filters)
     ].id
 
