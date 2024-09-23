@@ -4,6 +4,10 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Set up Selenium WebDriver (using Chrome)
 chrome_options = Options()
@@ -14,11 +18,10 @@ driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()), options=chrome_options
 )
 # Delinea Secret Server URL and credentials
-login_url = ""
-secrets_url = ""
-# replace with your domain login username and password
-username = "username"
-password = ""
+login_url = os.getenv("LOGIN_SITE")
+secrets_url = os.getenv("API_SITE")
+username = os.getenv("EMAIL")
+password = os.getenv("PASSWD")
 secret_id = "4143"
 
 

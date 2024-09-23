@@ -1,10 +1,14 @@
 import requests
 import pandas as pd
+import os
+from dotenv import load_dotenv
 
-site = ""  # ex: http://domain.com/SecretServer
+load_dotenv()
+
+site = os.getenv("API_SITE")
 authApi = "/oauth2/token"
 api = site + "/api/v2"
-token = ""
+token = os.getenv("API_TOKEN")
 
 
 def GetFailedHeartbeatSecrets():
@@ -38,9 +42,10 @@ def GetFailedHeartbeatSecrets():
         "ATCO Active directory account-linux-Ansible-Heartbeat",
         "ATCO RSA POC Domain Controllers Active Directory Account",
     ]
+
     failed_heartbeats = df[
         df["secretTemplateName"].isin(secret_templates)
         & df["lastHeartBeatStatus"].isin(status_filters)
-    ].id
+    ]
 
-    return failed_heartbeats
+    return failed_heartbeats["id"]
