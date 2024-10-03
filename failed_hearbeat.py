@@ -1,22 +1,16 @@
-from requests_html import HTMLSession
+import time
+import sys
 import requests
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-#___________________________________________________INPUT_______________________________________________________________
-site = ""  # ex: http://domain.com/SecretServer
-authApi = "/oauth2/token"
-api = site + "/api/v2"
-token = ""
-#replace wih local admin creds
-session = HTMLSession()
-
-
-#_____________________________________________GET TOKEN_________________________________________________________________
-def GetTotalNumberOfSecrets(token):
+def GetFailedHeartbeatSecrets():
     headers = {
         "Authorization": "Bearer " + token,
         "content-type": "application/json",
@@ -28,99 +22,137 @@ def GetTotalNumberOfSecrets(token):
         )
     secrets = resp.json()
     df = pd.DataFrame(secrets["records"])
-#_________________________________________________________FILTER___________________________________________________________________
-    # Filter rows based on AD Template
-    failed_heartbeats = df[
-    ((df["secretTemplateName"] == "Active Directory Account") | 
-        (df["secretTemplateName"] == "ATCO Active Directory") | 
-            (df["secretTemplateName"] == "ATCO Active directory account") | 
-                (df["secretTemplateName"] == "ATCO Active directory account -NO Heartbeat") |
-                    (df["secretTemplateName"] == "ATCO Active directory account RDP/PUTTY") | 
-                        (df["secretTemplateName"] == "ATCO Active directory account-linux") |
-                            (df["secretTemplateName"] == "ATCO Active directory account-linux-Ansible-Heartbeat") | 
-                                (df["secretTemplateName"] == "ATCO RSA POC Domain Controllers Active Directory Account")) 
-    &
-    # Filter rows based on lastHeartBeatStatus 
-    ((df["lastHeartBeatStatus"] == "Failed") | 
-        (df["lastHeartBeatStatus"] == "UnableToConnect") | 
-            (df["lastHeartBeatStatus"] == "AccountLockedOut") | 
-                (df["lastHeartBeatStatus"] == "UnknownError") )
+    # Filter rows where 'lastHeartBeatStatus' is 'Failed'
+    status_filters = [
+        "Failed",
+        "UnableToConnect",
+        "AccountLockedOut",
+        "UnknownError",
     ]
+    secret_templates = [
+        "ATCO Active Directory",
+        "ATCO Active directory account",
+        "ATCO Active directory account -NO Heartbeat",
+        "ATCO Active directory account RDP/PUTTY",
+        "ATCO Active directory account-linux",
+        "ATCO Active directory account-linux-Ansible-Heartbeat",
+        "ATCO RSA POC Domain Controllers Active Directory Account",
+        "ATCO EXT AD Secret Template",
+    ]
+    secret_templates_windows=[
+        "Windows Account - 60",
+    ]
+    failed_heartbeats = df[
+        df["secretTemplateName"].isin(secret_templates)
+        & df["lastHeartBeatStatus"].isin(status_filters)
+    ].id.tolist()  # Convert to a list
     
-    #saving the data into a csv file
-    failed_heartbeats.to_csv("C:/Users/0041TB744/Desktop/git auto/atco-delinea/failedheartbeat.csv")
-    length=len(failed_heartbeats)
-    df.to_csv("C:/Users/0041TB744/Desktop/git auto/atco-delinea/secret.csv")
-    # Display the filtered DataFrame
+    failed_heartbeats_win = df[
+        df["secretTemplateName"].isin(secret_templates_windows)
+        & df["lastHeartBeatStatus"].isin(status_filters)
+    ].id.tolist()  # Convert to a list
+    
+    return failed_heartbeats
 
-#___________________________________________________________TEST SECRET 4143____________________________________________________________
-    failed_heartbeat1 = failed_heartbeats.iloc[1, 0]
-    print(failed_heartbeat1)
-    resp1 = requests.get(
-        site + "/app#/secrets/checkout/4143", headers=headers
+# Set up Selenium WebDriver (using Chrome)
+chrome_driver_path = ''
+chrome_options = Options()
+chrome_options.add_argument("--start-maximized")
+service = Service(chrome_driver_path)
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Delinea Secret Server URL and credentials
+login_url = ""
+secrets_url = ""
+username = ""
+password = ""
+authApi = "/oauth2/token"
+api = secrets_url + "/api/v2"
+token = ""
+def login_to_secret_server():
+    driver.get(login_url)
+    time.sleep(5)
+    username_field = driver.find_element(By.ID, "input28")
+    password_field = driver.find_element(By.ID, "input36")
+    username_field.send_keys(username)
+    password_field.send_keys(password)
+    login_button = driver.find_element(By.CLASS_NAME, "button-primary")
+    login_button.click()
+    time.sleep(3)
+    push_button = driver.find_element(By.CLASS_NAME, "link-button")
+    push_button.click()
+    time.sleep(15)
+    push_button = driver.find_element(By.CLASS_NAME, "chiclet--action")
+    push_button.click()
+    href_value = ""
+    element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, f'//a[@href="{href_value}"]'))
     )
-    print(resp1)
-    failed_heartbeat4143=4143
-    # Check if the response is valid
-    if resp1.status_code == 200:
-        # Get the page content using requests-html
-        r = session.get(site + "/app#/secrets/checkout/4143", headers=headers)
-        # Render JavaScript (this will process the JavaScript on the page)
-        
-#_____________________________________USING HTML SESSION{code inside test block_______________________________________________________________________________        
-        #------------------Failing here----------------------------------------
-#        r.html.render()
-#        # Find the button by its ID and click it
-#        button = r.html.find('#checkout-button', first=True)
-#        if button:
-#            button.click()
-#            print(f"Clicked the checkout button for {failed_heartbeat4143}")
-#        else:
-#            print(f"Checkout button not found for {failed_heartbeat4143}")
-#    else:
-#        print(f"Failed to get a valid response for {failed_heartbeat4143}")
+    element.click()
+    time.sleep(10)
 
+# Function to checkout the secret
+def checkout_secret(secret_id):
+    driver.get(f"{secrets_url}/app/#/secrets/checkout/{secret_id}")
+    time.sleep(10)
+    try:
+        checkout_button = driver.find_element(By.XPATH, "//*[@id='checkout-button' or @id='force-check-in']")
+        checkout_button.click()
+        print(f"Secret {secret_id} checked out successfully.")
+        time.sleep(10)
+        #test case senario__________________________________________________________________________________________________________Start
+        if driver.find_element(By.XPATH, "//*[@id='checkout-button']"):
+            checkout_button = driver.find_element(By.XPATH, "//*[@id='checkout-button']")
+            checkout_button.click()
+            print(f"Secret {secret_id} checked out successfully.")
+        elif(driver.find_element(By.ID, "checkout-approval-options-menu-button")):
+            try:
+                checkin_option_button = driver.find_element(By.ID, "checkout-approval-options-menu-button")
+                checkin_option_button.click()
+                time.sleep(10)
+                checkin_button = driver.find_element(By.ID, "option-menu-check-in")
+                checkin_button.click()
+                time.sleep(5)
+                print(f"Secret {secret_id} checked in successfully.")
+            except Exception as e:
+                print(f"Failed to checkin secret {secret_id}: {str(e)}")
+                time.sleep(5)
+            #test case senario__________________________________________________________________________________________________________End--Delete in case of Disaster
+        print(f"Secret {secret_id} checked out successfully.")
+    except Exception as e:
+       print(f"Failed to checkout secret {secret_id}: {str(e)}")   
+    time.sleep(15)  
 
-#_______________________________________________________________FOR THE WHOLE DATA FRAME___________________________________________
-#For looping through   
-   
-    # Loop through the rows in the DataFrame
-    for i in range(length):
-        failed_heartbeat1 = failed_heartbeats.iloc[i, 0]
-        print(f"Failed heartbeat {i + 1}: {failed_heartbeat1}")
+# Function to check-in the secret
+def checkin_secret(secret_id):
+    try:
+        checkin_option_button = driver.find_element(By.ID, "checkout-approval-options-menu-button")
+        checkin_option_button.click()
+        time.sleep(10)
+        checkin_button = driver.find_element(By.ID, "option-menu-check-in")
+        checkin_button.click()
+        time.sleep(5)
+        print(f"Secret {secret_id} checked in successfully.")
+    except Exception as e:
+        print(f"Failed to checkin secret {secret_id}: {str(e)}")
+
+# Main automation sequence
+try:
+    # Log in to Secret Server
+    login_to_secret_server()
     
-        # Make the request using the current failed heartbeat
-        resp = requests.get(
-            f"{site}/app#/secrets/checkout/{failed_heartbeat1}", headers=headers
-         )
-            # Build the URL for the current heartbeat
-        url = f"{site}/app#/secrets/checkout/{failed_heartbeat1}"
-
-
-#_________________________________Selenium{inside looping}__________________________________________________________________________________________    
-    # Use Selenium to navigate to the page
-#    driver.get(url)
+    # Get the list of failed heartbeat secrets
+    failed_heartbeats_before = GetFailedHeartbeatSecrets()
+    print(len(failed_heartbeats_before))
+    print(failed_heartbeats_before)
     
-    # Wait for the page to load and the button to become clickable
-#    try:
-        # Locate and click the button with id "checkout-button"
-#        checkout_button = driver.find_element(By.ID, "checkout-button")
-#        checkout_button.click()
- #       print(f"Clicked on checkout button for {failed_heartbeat}")
- #   except Exception as e:
-  #      print(f"Failed to click checkout button for {failed_heartbeat}: {e}")
-#        print(resp)
-
-
-    
-    #failed_heartbeats to perform checkout-checkin
-    #id="checkout-button"
-    #id="checkout-approval-options-menu-button" 
-    
-# Example usage
-GetTotalNumberOfSecrets(token)
-
-
-# Close the session
-session.close()
- 
+    # Iterate over each secret ID and perform checkout and check-in
+    for secret_id in failed_heartbeats_before:
+        checkout_secret(secret_id)
+        checkin_secret(secret_id)
+    failed_heartbeats_after = GetFailedHeartbeatSecrets()
+    print(len(failed_heartbeats_after))
+    print(failed_heartbeats_after)
+finally:
+    # Close the browser window
+    driver.quit()
